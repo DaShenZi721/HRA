@@ -1,5 +1,5 @@
 # export MODEL_NAME="runwayml/stable-diffusion-v1-5"
-export MODEL_NAME="/home/shen_yuan/huggingface_aliendao/aliendao/dataroot/models/runwayml/stable-diffusion-v1-5"
+export MODEL_NAME="/home/HRA/huggingface_aliendao/aliendao/dataroot/models/runwayml/stable-diffusion-v1-5"
 export HF_HOME='/tmp'
 
 # Define the unique_token, class_tokens, and subject_names
@@ -301,7 +301,7 @@ if [ -d "$OUTPUT_DIR" ]; then
     continue
 fi
 
-. /home/shen_yuan/miniconda3/etc/profile.d/conda.sh
+. /home/HRA/miniconda3/etc/profile.d/conda.sh
 conda activate oft
 
 # max_train_steps=600 - 1400

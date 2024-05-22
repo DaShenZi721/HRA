@@ -114,7 +114,7 @@ def parse_args(input_args=None):
     parser.add_argument(
         "--pretrained_model_name_or_path",
         type=str,
-        default='/home/shen_yuan/huggingface_aliendao/aliendao/dataroot/models/runwayml/stable-diffusion-v1-5',
+        default='/home/HRA/huggingface_aliendao/aliendao/dataroot/models/runwayml/stable-diffusion-v1-5',
         help="Path to pretrained model or model identifier from huggingface.co/models.",
     )
     parser.add_argument(
