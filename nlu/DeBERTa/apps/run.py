@@ -42,7 +42,7 @@ def create_model(args, num_labels, model_class_fn):
   rank = getattr(args, 'rank', 0)
   init_model = args.init_model if rank<1 else None
   if init_model == 'deberta-v3-base':
-    init_model = '/home/shen_yuan/OFT/oft/models/deberta-v3-base'
+    init_model = '/home/HRA/OFT/oft/models/deberta-v3-base'
   model = model_class_fn(init_model, args.model_config, num_labels=num_labels, \
       drop_out=args.cls_drop_out, \
       pre_trained = args.pre_trained)

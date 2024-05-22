@@ -7,49 +7,49 @@ Downloading and extracting SST...
 Processing MRPC...
 Local MRPC data not specified, downloading data from https://dl.fbaipublicfiles.com/senteval/senteval_data/msr_paraphrase_train.txt
 Traceback (most recent call last):
-  File "/home/shen_yuan/miniconda3/envs/nlu/lib/python3.10/urllib/request.py", line 1348, in do_open
+  File "/home/HRA/miniconda3/envs/nlu/lib/python3.10/urllib/request.py", line 1348, in do_open
     h.request(req.get_method(), req.selector, req.data, headers,
-  File "/home/shen_yuan/miniconda3/envs/nlu/lib/python3.10/http/client.py", line 1283, in request
+  File "/home/HRA/miniconda3/envs/nlu/lib/python3.10/http/client.py", line 1283, in request
     self._send_request(method, url, body, headers, encode_chunked)
-  File "/home/shen_yuan/miniconda3/envs/nlu/lib/python3.10/http/client.py", line 1329, in _send_request
+  File "/home/HRA/miniconda3/envs/nlu/lib/python3.10/http/client.py", line 1329, in _send_request
     self.endheaders(body, encode_chunked=encode_chunked)
-  File "/home/shen_yuan/miniconda3/envs/nlu/lib/python3.10/http/client.py", line 1278, in endheaders
+  File "/home/HRA/miniconda3/envs/nlu/lib/python3.10/http/client.py", line 1278, in endheaders
     self._send_output(message_body, encode_chunked=encode_chunked)
-  File "/home/shen_yuan/miniconda3/envs/nlu/lib/python3.10/http/client.py", line 1038, in _send_output
+  File "/home/HRA/miniconda3/envs/nlu/lib/python3.10/http/client.py", line 1038, in _send_output
     self.send(msg)
-  File "/home/shen_yuan/miniconda3/envs/nlu/lib/python3.10/http/client.py", line 976, in send
+  File "/home/HRA/miniconda3/envs/nlu/lib/python3.10/http/client.py", line 976, in send
     self.connect()
-  File "/home/shen_yuan/miniconda3/envs/nlu/lib/python3.10/http/client.py", line 1448, in connect
+  File "/home/HRA/miniconda3/envs/nlu/lib/python3.10/http/client.py", line 1448, in connect
     super().connect()
-  File "/home/shen_yuan/miniconda3/envs/nlu/lib/python3.10/http/client.py", line 942, in connect
+  File "/home/HRA/miniconda3/envs/nlu/lib/python3.10/http/client.py", line 942, in connect
     self.sock = self._create_connection(
-  File "/home/shen_yuan/miniconda3/envs/nlu/lib/python3.10/socket.py", line 845, in create_connection
+  File "/home/HRA/miniconda3/envs/nlu/lib/python3.10/socket.py", line 845, in create_connection
     raise err
-  File "/home/shen_yuan/miniconda3/envs/nlu/lib/python3.10/socket.py", line 833, in create_connection
+  File "/home/HRA/miniconda3/envs/nlu/lib/python3.10/socket.py", line 833, in create_connection
     sock.connect(sa)
 OSError: [Errno 101] Network is unreachable
 
 During handling of the above exception, another exception occurred:
 
 Traceback (most recent call last):
-  File "/home/shen_yuan/OFT/DeBERTa/experiments/glue/dataset/glue.py", line 172, in <module>
+  File "/home/HRA/OFT/DeBERTa/experiments/glue/dataset/glue.py", line 172, in <module>
     sys.exit(main(sys.argv[1:]))
-  File "/home/shen_yuan/OFT/DeBERTa/experiments/glue/dataset/glue.py", line 164, in main
+  File "/home/HRA/OFT/DeBERTa/experiments/glue/dataset/glue.py", line 164, in main
     format_mrpc(args.data_dir, args.path_to_mrpc)
-  File "/home/shen_yuan/OFT/DeBERTa/experiments/glue/dataset/glue.py", line 80, in format_mrpc
+  File "/home/HRA/OFT/DeBERTa/experiments/glue/dataset/glue.py", line 80, in format_mrpc
     urllib.request.urlretrieve(TASK2PATH["MRPC"], os.path.join(mrpc_dir, "dev_ids.tsv"))
-  File "/home/shen_yuan/miniconda3/envs/nlu/lib/python3.10/urllib/request.py", line 241, in urlretrieve
+  File "/home/HRA/miniconda3/envs/nlu/lib/python3.10/urllib/request.py", line 241, in urlretrieve
     with contextlib.closing(urlopen(url, data)) as fp:
-  File "/home/shen_yuan/miniconda3/envs/nlu/lib/python3.10/urllib/request.py", line 216, in urlopen
+  File "/home/HRA/miniconda3/envs/nlu/lib/python3.10/urllib/request.py", line 216, in urlopen
     return opener.open(url, data, timeout)
-  File "/home/shen_yuan/miniconda3/envs/nlu/lib/python3.10/urllib/request.py", line 519, in open
+  File "/home/HRA/miniconda3/envs/nlu/lib/python3.10/urllib/request.py", line 519, in open
     response = self._open(req, data)
-  File "/home/shen_yuan/miniconda3/envs/nlu/lib/python3.10/urllib/request.py", line 536, in _open
+  File "/home/HRA/miniconda3/envs/nlu/lib/python3.10/urllib/request.py", line 536, in _open
     result = self._call_chain(self.handle_open, protocol, protocol +
-  File "/home/shen_yuan/miniconda3/envs/nlu/lib/python3.10/urllib/request.py", line 496, in _call_chain
+  File "/home/HRA/miniconda3/envs/nlu/lib/python3.10/urllib/request.py", line 496, in _call_chain
     result = func(*args)
-  File "/home/shen_yuan/miniconda3/envs/nlu/lib/python3.10/urllib/request.py", line 1391, in https_open
+  File "/home/HRA/miniconda3/envs/nlu/lib/python3.10/urllib/request.py", line 1391, in https_open
     return self.do_open(http.client.HTTPSConnection, req,
-  File "/home/shen_yuan/miniconda3/envs/nlu/lib/python3.10/urllib/request.py", line 1351, in do_open
+  File "/home/HRA/miniconda3/envs/nlu/lib/python3.10/urllib/request.py", line 1351, in do_open
     raise URLError(err)
 urllib.error.URLError: <urlopen error [Errno 101] Network is unreachable>

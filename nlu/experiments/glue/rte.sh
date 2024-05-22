@@ -105,4 +105,4 @@ python -m DeBERTa.apps.run --model_config config.json  \
 	--init_model $init \
 	--task_name $Task \
 	--data_dir $cache_dir/$Task \
-	--output_dir /home/shen_yuan/OFT/DeBERTa/outputs/$tag/${Task}
+	--output_dir /home/HRA/OFT/DeBERTa/outputs/$tag/${Task}

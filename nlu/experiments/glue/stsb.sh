@@ -99,4 +99,4 @@ python -m DeBERTa.apps.run --model_config config.json  \
 	--data_dir $cache_dir/$Task \
 	--init_model $init \
 	--max_seq_len 128 \
-	--output_dir /home/shen_yuan/OFT/DeBERTa/outputs/$tag/${Task}
+	--output_dir /home/HRA/OFT/DeBERTa/outputs/$tag/${Task}

@@ -25,12 +25,14 @@ import argparse
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--input_path', type=str, default='./models/v1-5-pruned.ckpt')
-parser.add_argument('--output_path', type=str, default='./models/householder_l_1.ckpt')
-parser.add_argument('--l', type=int, default=7)
-parser.add_argument('--eps', type=float, default=1e-3)
+parser.add_argument('--output_path', type=str, default='./models/householder_none_l_8.ckpt')
+parser.add_argument('--l', type=int, default=8)
+parser.add_argument('--add_orth', type=str, default='none')
+# none, gramschmidt
+parser.add_argument('--eps', type=float, default=7e-6)
 args = parser.parse_args()
 
-args.output_path = f'./models/householder_l_{args.l}.ckpt'
+# args.output_path = f'./models/householder_none_l_8.ckpt'
 
 assert os.path.exists(args.input_path), 'Input model does not exist.'
 # assert not os.path.exists(output_path), 'Output filename already exists.'
@@ -48,7 +50,7 @@ def get_node_name(name, parent_name):
 model = create_model(config_path='./configs/oft_ldm_v15.yaml')
 model.model.requires_grad_(False)
 
-unet_lora_params, train_names = inject_trainable_householder(model.model, l=args.l, eps=args.eps)
+unet_lora_params, train_names = inject_trainable_householder(model.model, l=args.l, eps=args.eps, add_orth=args.add_orth)
 # unet_lora_params, train_names = inject_trainable_householder_conv(model.model, r=args.r, eps=args.eps)
 # unet_lora_params, train_names = inject_trainable_householder_extended(model.model, r=args.r, eps=args.eps)
 

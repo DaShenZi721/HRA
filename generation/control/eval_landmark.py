@@ -96,9 +96,11 @@ def landmark_comparison(lmk_folder, gt_lmk_folder, n=0):
     with open('./data/celebhq-text/prompt_val_blip_full.json', 'rt') as f: # fill50k, COCO
         for line in f:
             val_data = json.loads(line)
-    for i in tqdm(range(2000)):
+    # for i in tqdm(range(2000)):
+    for i in tqdm(range(len(val_data))):
         # import ipdb; ipdb.set_trace()
-        line = val_data[n]
+        # line = val_data[n]
+        line = val_data[i]
 
         img_name = line["image"][:-4]
         lmk1_path = os.path.join(gt_lmk_folder, f'{img_name}.txt')
@@ -113,11 +115,12 @@ def landmark_comparison(lmk_folder, gt_lmk_folder, n=0):
     print(np.mean(lmk_err))
     np.save(os.path.join(lmk_folder, 'lmk_err.npy'), lmk_err)
 
-
 n = 0
 epoch = 19
 gt_lmk_folder = './data/celebhq-text/celeba-hq-landmark2d'
-input_folder = os.path.join('./data/image_log_opt_lora_CelebA_landmark_lr_5-6_pe_diff_mlp_r_4_cayley_4gpu/results', str(epoch))
+# input_folder = os.path.join('./data/image_log_opt_lora_CelebA_landmark_lr_5-6_pe_diff_mlp_r_4_cayley_4gpu/results', str(epoch))
+input_folder = os.path.join('log/image_log_householder_none_ADE20K_segm_eps_7e-06_pe_diff_mlp_l_8_8gpu_2024-05-15-19-33-41-650524/results', str(epoch))
+# input_folder = os.path.join('log/image_log_oft_CelebA_landmark_eps_0.001_pe_diff_mlp_r_4_8gpu_2024-03-21-19-07-34-175825/train_with_norm/results', str(epoch))
 save_folder = os.path.join(input_folder, 'landmark')
 
 generate_landmark2d(input_folder, save_folder, n, device='cuda:0', vis=False)

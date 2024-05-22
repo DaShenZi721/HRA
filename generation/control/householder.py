@@ -20,6 +20,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+import matplotlib.pyplot as plt
+
 try:
     from safetensors.torch import safe_open
     from safetensors.torch import save_file as safe_save
@@ -62,7 +64,7 @@ def project_batch(R, eps=1e-5):
 
 class HouseholderInjectedLinear(nn.Module):
     def __init__(
-        self, in_features, out_features, bias=False, l=1, eps=1e-5, 
+        self, in_features, out_features, bias=False, l=1, eps=1e-5, add_orth='none',
     ):
         super().__init__()
 
@@ -73,30 +75,80 @@ class HouseholderInjectedLinear(nn.Module):
 
         self.in_features=in_features
         self.out_features=out_features
+        
         self.l = l
-        self.v_list = nn.ParameterList()
-        for _ in range(l):
-            self.v_list.append(nn.Parameter(torch.zeros(in_features, 1), requires_grad=True))
         self.eps = eps
-
+        self.gramschmidt = True if add_orth == 'gramschmidt' else False
+        # self.householder_U = nn.ParameterList()
+        # for _ in range(l):
+        #     self.householder_U.append(nn.Parameter(torch.zeros(in_features, 1), requires_grad=True))
+        #     nn.init.kaiming_uniform_(self.householder_U[-1], a=1/eps) 
+        self.householder_U = nn.Parameter(
+            torch.cat([torch.eye(l, l), torch.zeros(in_features-l, l)], dim=0), 
+            requires_grad=True
+        )
+        # self.householder_U = nn.Parameter(torch.zeros(in_features, l), requires_grad=True)
+        # nn.init.kaiming_uniform_(self.householder_U, a=1/eps)
+        
         # Define the fixed Linear layer
         self.fixed_linear = torch.nn.Linear(in_features=in_features, out_features=out_features, bias=bias)
 
     def forward(self, x):
-        dtype = self.v_list[0].dtype
+        dtype = self.householder_U.dtype
         
-        unit_v_list = [v / (torch.sqrt(torch.sum(v ** 2)) + self.eps) for v in self.v_list]
+        filt = self.fixed_linear.weight.data.to(dtype)
         
-        fix_filt = self.fixed_linear.weight.data.to(dtype)
-        for unit_v in unit_v_list:
-            filt = torch.mm(fix_filt, 1 - 2 * unit_v @ unit_v.t())
+        if self.gramschmidt:
+            U_list = []
+            U_list.append((self.householder_U[:, 0] / self.householder_U[:, 0].norm()).view(-1, 1))
+            for i in range(1, self.l):
+                Ui = self.householder_U[:, i].view(-1, 1)
+                for j in range(i):
+                    Ui = Ui - (U_list[j].t() @ Ui) * U_list[j]
+                U_list.append((Ui / Ui.norm()).view(-1, 1))
+            U_list = torch.cat(U_list, dim=1)
+            filt = filt @ (torch.eye(self.in_features, device=x.device) - 2 * U_list @ U_list.t())
+            
+        else:
+            # if isinstance(self.householder_U, List):
+            #     unit_v_list = [v / (torch.sqrt(torch.sum(v ** 2) + self.eps)) for v in self.householder_U]
+            
+            # filt = torch.eye(self.in_features, device=x.device)
+            # for unit_v in unit_v_list:
+            #     filt = torch.mm(filt, torch.eye(self.in_features, device=x.device) - 2 * unit_v @ unit_v.t())
+
+            # matrix = filt - torch.eye(self.in_features, device=x.device)
+            # plt.imshow(matrix[:50,:50].abs().cpu().numpy(), cmap='viridis')  # 使用viridis颜色映射
+            # plt.colorbar()  # 添加颜色条
+            # plt.savefig('/home/shen_yuan/OFT/oft/output_imgs/image_log_householder_CelebA_landmark_eps_7e-06_pe_diff_mlp_l_8_8gpu_2024-04-07-21-47-31-690314_matrix_0.png')
+            
+            # U = torch.cat(unit_v_list, dim=1)
+            # print(U.shape)
+            # gamma = torch.linalg.pinv(U) @ (filt - torch.eye(self.in_features, device=x.device)) @ torch.linalg.pinv(U.t())
+            # print(gamma)
+            # print(gamma.shape)
+            # print(gamma.abs().sum())
+            # plt.imshow(gamma.abs().cpu().numpy(), cmap='viridis')  # 使用viridis颜色映射
+            # plt.colorbar()  # 添加颜色条
+            # # plt.title('Matrix Visualization')  # 添加标题
+            # # plt.xlabel('X Axis')  # 添加X轴标签
+            # # plt.ylabel('Y Axis')  # 添加Y轴标签
+
+            # # 保存图像
+            # plt.savefig('/home/shen_yuan/OFT/oft/output_imgs/image_log_householder_CelebA_landmark_eps_7e-06_pe_diff_mlp_l_8_8gpu_2024-04-07-21-47-31-690314_gamma_0.png')
+            # 1/0
+            
+            householder_U_norm = self.householder_U / torch.sqrt(torch.sum(self.householder_U**2, dim=0) + self.eps)
+            # householder_U_norm = self.householder_U / (self.householder_U.norm(dim=0))
+            for l in range(self.l):
+                Ui = householder_U_norm[:, l].view(-1, 1)
+                filt = torch.mm(filt, torch.eye(self.in_features, device=x.device) - 2 * Ui @ Ui.t())
         
         bias_term = self.fixed_linear.bias.data if self.fixed_linear.bias is not None else None
         out = nn.functional.linear(input=x, weight=filt, bias=bias_term)
         
         return out
-        
-    
+
 
 class OFTInjectedLinear_with_norm(nn.Module):
     def __init__(
@@ -442,6 +494,7 @@ def inject_trainable_householder(
     verbose: bool = False,
     l: int = 1,
     eps: float = 1e-3,
+    add_orth: str = 'none',
 ):
     """
     inject oft into model, and returns oft parameter groups.
@@ -465,6 +518,7 @@ def inject_trainable_householder(
             _child_module.bias is not None,
             l=l,
             eps=eps,
+            add_orth=add_orth,
         )
         _tmp.fixed_linear.weight = weight
         if bias is not None:
@@ -474,10 +528,10 @@ def inject_trainable_householder(
         _tmp.to(_child_module.weight.device).to(_child_module.weight.dtype)
         _module._modules[name] = _tmp
 
-        require_grad_params.append(_module._modules[name].v_list)
-
-        for idx, v in enumerate(_module._modules[name].v_list):
-            _module._modules[name].v_list[idx].requires_grad = True
+        require_grad_params.append(_module._modules[name].householder_U)
+        _module._modules[name].householder_U.requires_grad = True
+        # for idx, v in enumerate(_module._modules[name].householder_U):
+        #     _module._modules[name].householder_U[idx].requires_grad = True
         names.append(name)
 
     return require_grad_params, names

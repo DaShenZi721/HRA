@@ -22,6 +22,8 @@ from pytorch_lightning import seed_everything
 from oldm.model import create_model, load_state_dict
 from oldm.ddim_hacked import DDIMSampler
 from oft import inject_trainable_oft, inject_trainable_oft_conv, inject_trainable_oft_extended, inject_trainable_oft_with_norm
+from householder import inject_trainable_householder, inject_trainable_householder_conv, inject_trainable_householder_extended, inject_trainable_householder_with_norm
+from lora import inject_trainable_lora
 
 from dataset.utils import return_dataset
 
@@ -71,29 +73,63 @@ def process(input_image, prompt, hint_image, a_prompt, n_prompt, num_samples, im
 
 parser = argparse.ArgumentParser()
 
+parser.add_argument('--d', type=int, help='the index of GPU', default=0)
+
+parser.add_argument('--l', type=int, default=8)
+parser.add_argument('--add_orth', type=str, default='gramschmidt')
+# none, gramschmidt
 parser.add_argument('--r', type=int, default=4)
-parser.add_argument('--eps', type=float, default=1e-5)
-parser.add_argument('--coft', action="store_true")
+parser.add_argument('--eps', 
+                    type=float, 
+                    choices=[1e-3, 2e-5, 7e-6],
+                    default=7e-6,
+                    )
+parser.add_argument('--coft', action="store_true", default=True)
 parser.add_argument('--block_share', action="store_true", default=False)
-parser.add_argument('--img_ID', type=int, default=0)
-parser.add_argument('--num_samples', type=int, default=6)
+parser.add_argument('--img_ID', type=int, default=1)
+parser.add_argument('--num_samples', type=int, default=8)
 parser.add_argument('--batch', type=int, default=20)
+parser.add_argument('--sd_locked', action="store_true", default=True)
+parser.add_argument('--only_mid_control', action="store_true", default=False)
 parser.add_argument('--num_gpus', type=int, default=8)
+# parser.add_argument('--time_str', type=str, default=datetime.now().strftime("%Y-%m-%d-%H-%M-%S-%f"))
+parser.add_argument('--time_str', type=str, default='2024-03-18-10-55-21-089985')
+parser.add_argument('--epoch', type=int, default=19)
+parser.add_argument('--control', 
+                    type=str, 
+                    help='control signal. Options are [segm, sketch, densepose, depth, canny, landmark]', 
+                    default="canny")
 
 args = parser.parse_args()
 
 if __name__ == '__main__':
     # Configs
-    epoch = 0
-    control = 'densepose'
+    epoch = args.epoch
+    control = args.control
     _, dataset, data_name, logger_freq, max_epochs = return_dataset(control, full=True)
 
     # specify the experiment name
-    experiment = './log/image_log_oft_{}_{}_eps_{}_pe_diff_mlp_r_{}_{}gpu'.format(data_name, control, args.eps, args.r, args.num_gpus)
+    # experiment = './log/image_log_oft_{}_{}_eps_{}_pe_diff_mlp_r_{}_{}gpu'.format(data_name, control, args.eps, args.r, args.num_gpus)
     
+    num_gpus = args.num_gpus
+    time_str = args.time_str
+    # experiment = 'log/image_log_oft_{}_{}_eps_{}_pe_diff_mlp_r_{}_{}gpu_{}'.format(data_name, control, args.eps, args.r, num_gpus, time_str)
+    experiment = './log/image_log_householder_gramschmidt_COCO_canny_eps_7e-06_pe_diff_mlp_l_8_8gpu_2024-05-19-21-22-24-466032'
+    # experiment = './log/image_log_oft_ADE20K_segm_eps_0.001_pe_diff_mlp_r_4_8gpu_2024-03-25-21-04-17-549433/train_with_norm'
+    
+    assert args.control in experiment
+    
+    if 'train_with_norm' in experiment:
+        epoch = 4
+    else:
+        if 'COCO' in experiment:
+            epoch = 0
+        else:
+            epoch = 19
+            
     resume_path = os.path.join(experiment, f'model-epoch={epoch:02d}.ckpt')
-    sd_locked = True
-    only_mid_control = False
+    sd_locked = args.sd_locked
+    only_mid_control = args.only_mid_control
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
     # Result directory
@@ -107,22 +143,45 @@ if __name__ == '__main__':
     model = create_model('./configs/oft_ldm_v15.yaml').cpu()
     model.model.requires_grad_(False)
 
-    unet_lora_params, train_names = inject_trainable_oft(model.model, r=args.r, eps=args.eps, is_coft=args.coft, block_share=args.block_share)
-    # unet_lora_params, train_names = inject_trainable_oft_conv(model.model, r=args.r, eps=args.eps, is_coft=args.coft, block_share=args.block_share)
-    # unet_lora_params, train_names = inject_trainable_oft_extended(model.model, r=args.r, eps=args.eps, is_coft=args.coft, block_share=args.block_share)
-    # unet_opt_params, train_names = inject_trainable_oft_with_norm(model.model, r=args.r, eps=args.eps, is_coft=args.coft, block_share=args.block_share)
+    if 'householder' in experiment:
+        unet_lora_params, train_names = inject_trainable_householder(model.model, l=args.l, eps=args.eps, add_orth=args.add_orth)
+    elif 'lora' in experiment:
+        unet_lora_params, train_names = inject_trainable_lora(model.model, rank=args.r, network_alpha=None)
+    else:
+        if 'train_with_norm' in experiment:
+            unet_opt_params, train_names = inject_trainable_oft_with_norm(model.model, r=args.r, eps=args.eps, is_coft=args.coft, block_share=args.block_share)
+        else:   
+            unet_lora_params, train_names = inject_trainable_oft(model.model, r=args.r, eps=args.eps, is_coft=args.coft, block_share=args.block_share)
+        # unet_lora_params, train_names = inject_trainable_oft_conv(model.model, r=args.r, eps=args.eps, is_coft=args.coft, block_share=args.block_share)
+        # unet_lora_params, train_names = inject_trainable_oft_extended(model.model, r=args.r, eps=args.eps, is_coft=args.coft, block_share=args.block_share)
+    
     
     model.load_state_dict(load_state_dict(resume_path, location='cuda'))
     model = model.cuda()
     ddim_sampler = DDIMSampler(model)
 
-    pack = range(0, len(dataset), args.batch)
-    formatted_data = {}
-    for index in range(args.batch):
-        # import ipdb; ipdb.set_trace()
-        start_point = pack[args.img_ID]
-        idx = start_point + index
-
+    # pack = range(0, len(dataset), args.batch)
+    # formatted_data = {}
+    # for index in range(args.batch):
+    #     # import ipdb; ipdb.set_trace()
+    #     start_point = pack[args.img_ID]
+    #     idx = start_point + index
+    
+    # num_pack = len(dataset) // args.num_gpus
+    # start_idx = args.d * num_pack
+    # end_idx = (args.d + 1) * num_pack if args.d < args.num_gpus - 1 else len(dataset)
+    
+    # for idx in range(start_idx, end_idx):
+    
+    # canny
+    img_list = [378, 441, 0, 31, 115, 182, 59, 60, 66, 269, ]
+    # landmark
+    # img_list = [139, 179, 197, 144, 54, 71, 76, 98, 100, 277, ]
+    # segm
+    # img_list = [14, 667, 576, 1387, 1603, 1697, 987, 1830, 1232, 1881, ]
+    
+    for idx in img_list:
+    
         data = dataset[idx]
         input_image, prompt, hint = data['jpg'], data['txt'], data['hint']
         # input_image, hint = input_image.to(device), hint.to(device)
@@ -145,7 +204,6 @@ if __name__ == '__main__':
                 low_threshold=100,
                 high_threshold=200,
             )
-
             for i, image in enumerate(result_images):
                 if i == 0:
                     image = ((image + 1) * 127.5).clip(0, 255).astype(np.uint8)

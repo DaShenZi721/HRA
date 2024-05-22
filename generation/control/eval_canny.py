@@ -70,8 +70,17 @@ if __name__ == '__main__':
     high_threshold = 200
 
     n = 0
-    epoch = 9
-    experiment = './log/image_log_oft_COCO_canny_eps_1-3_r_4_cayley_4gpu' 
+    # epoch = 10
+    # experiment = './log/image_log_oft_COCO_canny_eps_1-3_r_4_cayley_4gpu' 
+    experiment = 'log/image_log_householder_gramschmidt_COCO_canny_eps_7e-06_pe_diff_mlp_l_8_8gpu_2024-05-19-21-22-24-466032'
+    
+    if 'train_with_norm' in experiment:
+        epoch = 4
+    else:
+        if 'COCO' in experiment:
+            epoch = 10
+        else:
+            epoch = 19
 
     data_dir = os.path.join(experiment, 'source', str(epoch))
     result_dir = os.path.join(experiment, 'results', str(epoch))
@@ -94,7 +103,7 @@ if __name__ == '__main__':
     accuracy_mean = 0
     f1_score_mean = 0
     ssim_mean = 0
-    for i, data in tqdm(enumerate(data_loader)):
+    for i, data in tqdm(enumerate(data_loader), total=len(data_loader)):
         source_image, result_image = data
         # Convert the tensor to a numpy array and transpose it to have the channels last (H, W, C)
         source_image_np = source_image.squeeze(0).permute(1, 2, 0).numpy()
