@@ -1,0 +1,29 @@
+{
+	"pooling": {
+		"dropout": 0,
+		"hidden_act": "gelu"
+	},
+	"inject_adapter": "householder",
+	"householder": {
+		"l": 8,
+		"eps": 1e-4,
+		"init_a": 1e-4,
+		"add_orth": "soft", 
+		"householder_dropout": 1e-2,
+		"suffix": ["householder_U"]
+	},
+	"oft": {
+		"block_size": 16,
+		"is_coft": true,
+		"block_share": false,
+		"eps": 1e-5,
+		"suffix": ["oft_R"]
+	},
+	"lora": {
+		"lora_r": 8,
+		"lora_alpha": 32,
+		"merge_weights": false,
+		"lora_dropout": 0,
+		"suffix": ["lora_A", "lora_B"]
+	}
+}
