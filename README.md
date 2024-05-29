@@ -65,3 +65,14 @@ python tools/test.py local_configs/segformer/B4/segformer.b4.512x512.ade.160k.py
 cd nlu
 experiments/glue/mnli.sh deberta-v3-base
 ```
+## Citing our work
+```bibtex
+@misc{yuan2024bridging,
+      title={Bridging The Gap between Low-rank and Orthogonal Adaptation via Householder Reflection Adaptation}, 
+      author={Shen Yuan and Haotian Liu and Hongteng Xu},
+      year={2024},
+      eprint={2405.17484},
+      archivePrefix={arXiv},
+      primaryClass={cs.LG}
+}
+```
