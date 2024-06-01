@@ -65,6 +65,66 @@ python tools/test.py local_configs/segformer/B4/segformer.b4.512x512.ade.160k.py
 cd nlu
 experiments/glue/mnli.sh deberta-v3-base
 ```
+
+### Mathematical reasoning
+We have not yet completed the integration of HRA code into PEFT. Before that, if you want to try using the HRA method to fine-tune large models, you can follow the steps below.
+
+Go to the llama folder
+```bash
+cd llama
+```
+
+#### Environment Setup
+We recommend using Python 3.10 for your environment and use the conda to install it.
+```bash
+conda create -n pytorch python=3.10
+```
+Then install the required packages with the following command:
+```bash
+pip install -r requirements.txt
+```
+Please note that the peft package and transformer package must be downloaded with the versions consistent with those listed in the requirements file. 
+
+After completing the download, please replace the **oft** folder inside the `**peft/tuners** within your running environment's **python/site-packages** with the **oft** folder from the current directory.
+
+The path for the oft folder in the environment should be:
+
+```bash
+/your_path/anaconda3/envs/pytorch/lib/python3.10/site-packages/peft/tuners/
+```
+The **layer.py** in the current oft directory is implemented for when λ is not infinity.
+
+If you want to simulate when λ is infinity, please replace **layer.py** with **layer_GS_HRA.py**, and set the hyperparameter λ to 0 during training.
+
+
+#### Prepare Dataset
+The dataset we use for fine-tuning is MetaMathQA-40K, which can be downloaded through this [link](https://huggingface.co/datasets/meta-math/MetaMathQA-40K).
+#### Prepare model
+The model we use for fine-tuning is llama2. You can choose the model you want to fine-tune.
+#### Finetune
+Run the following code to complete the fine-tuning:
+```bash
+bash tune.sh
+```
+Please note that you need to change the dataset path, the path of the pre-trained model, and you can change the parameters according to your needs in tune.sh. That is:
+```bash
+BASE_MODEL="YOUR_MODEL_PATH"
+DATA_PATH="YOUR_DATA_PATH"
+OUTPUT="YOUR_MODEL_SAVED_PATH"
+```
+#### Evaluation
+After the training is complete, you can run the following command to test:
+```bash
+bash test.sh
+```
+Please note to change the model path in it:
+```bash
+BASE_MODEL="YOUR_MODEL_PATH"
+OUTPUT="YOUR_MODEL_SAVED_PATH"
+```
+
+
+
 ## Citing our work
 ```bibtex
 @misc{yuan2024bridging,
@@ -76,3 +136,5 @@ experiments/glue/mnli.sh deberta-v3-base
       primaryClass={cs.LG}
 }
 ```
+
+

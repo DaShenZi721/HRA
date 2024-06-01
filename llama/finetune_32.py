@@ -1,13 +1,22 @@
 import copy
-import os
-from dataclasses import dataclass, field
-from typing import Optional, Dict, Sequence, List, Literal
+from dataclasses import field
+from typing import Sequence, Literal
 
-import torch
 import transformers
 from transformers import Trainer
+from transformers.modeling_utils import *
+from transformers.trainer import _is_peft_model
+from transformers.models.auto.modeling_auto import MODEL_FOR_CAUSAL_LM_MAPPING_NAMES
+from transformers.data.data_collator import DataCollator
+
+from transformers.training_args import TrainingArguments
+from transformers.tokenization_utils_base import PreTrainedTokenizerBase
+from transformers.trainer_callback import TrainerCallback
+from transformers.trainer_utils import EvalPrediction
+from torch.utils.data import Dataset, IterableDataset
+
 from datasets import load_dataset
-from peft import LoraConfig, get_peft_model, PeftModel, HRAConfig
+from peft import LoraConfig, get_peft_model, PeftModel, OFTConfig
 
 IGNORE_INDEX = -100
 DEFAULT_PAD_TOKEN = "[PAD]"
@@ -20,6 +29,76 @@ PROMPT = (
     "### Instruction:\n{instruction}\n\n### Response:"
 )
 
+
+class MyTrainer(Trainer):
+
+    def __init__(
+            self,
+            model: Union[PreTrainedModel, nn.Module] = None,
+            args: TrainingArguments = None,
+            data_collator: Optional[DataCollator] = None,
+            train_dataset: Optional[Union[Dataset, IterableDataset, "datasets.Dataset"]] = None,
+            eval_dataset: Optional[Union[Dataset, Dict[str, Dataset], "datasets.Dataset"]] = None,
+            tokenizer: Optional[PreTrainedTokenizerBase] = None,
+            model_init: Optional[Callable[[], PreTrainedModel]] = None,
+            compute_metrics: Optional[Callable[[EvalPrediction], Dict]] = None,
+            callbacks: Optional[List[TrainerCallback]] = None,
+            optimizers: Tuple[torch.optim.Optimizer, torch.optim.lr_scheduler.LambdaLR] = (None, None),
+            preprocess_logits_for_metrics: Optional[Callable[[torch.Tensor, torch.Tensor], torch.Tensor]] = None,
+            lamda: float = 1e-4
+    ):
+        super().__init__(model, args, data_collator, train_dataset, eval_dataset, tokenizer, model_init,
+                         compute_metrics, callbacks, optimizers, preprocess_logits_for_metrics)
+        self.lamda = lamda
+
+    def compute_loss(self, model, inputs, return_outputs=False):
+        """
+        How the loss is computed by Trainer. By default, all models return the loss in the first element.
+
+        Subclass and override for custom behavior.
+        """
+        if self.label_smoother is not None and "labels" in inputs:
+            labels = inputs.pop("labels")
+        else:
+            labels = None
+        outputs = model(**inputs)
+        # Save past state if it exists
+        # TODO: this needs to be fixed and made cleaner later.
+        if self.args.past_index >= 0:
+            self._past = outputs[self.args.past_index]
+
+        if labels is not None:
+            unwrapped_model = unwrap_model(model)
+            if _is_peft_model(unwrapped_model):
+                model_name = unwrapped_model.base_model.model._get_name()
+            else:
+                model_name = unwrapped_model._get_name()
+            if model_name in MODEL_FOR_CAUSAL_LM_MAPPING_NAMES.values():
+                loss = self.label_smoother(outputs, labels, shift_labels=True)
+            else:
+                loss = self.label_smoother(outputs, labels)
+        else:
+            if isinstance(outputs, dict) and "loss" not in outputs:
+                raise ValueError(
+                    "The model did not return a loss from the inputs, only the following keys: "
+                    f"{','.join(outputs.keys())}. For reference, the inputs it received are {','.join(inputs.keys())}."
+                )
+            # We don't use .loss here since the model may return tuples instead of ModelOutput.
+            loss = outputs["loss"] if isinstance(outputs, dict) else outputs[0]
+        # ------------------------------------------------------------------------------
+
+        for name, param in model.named_parameters():
+            if 'oft_r' in name:
+                device = param.device
+                householder_U_norm = param / param.norm(dim=0)
+                orth_loss = torch.norm(
+                    torch.eye(householder_U_norm.size(1), device=device) - householder_U_norm.t() @ householder_U_norm)
+                print(self.lamda)
+                loss = loss + self.lamda * orth_loss.to(loss.device)
+
+        # ------------------------------------------------------------------------------
+
+        return (loss, outputs) if return_outputs else loss
 
 
 @dataclass
@@ -38,8 +117,9 @@ class TrainingArguments(transformers.TrainingArguments):
         "help": "Maximum sequence length. Sequences will be right padded (and possibly truncated)."}, )
     hrft_r: int = field(default=8, metadata={
         "help": "The rank of the adapter. When passing `None` and `adapter_name_or_path` is also `None`, full fine-tuning is used."})
-    init_a: float = field(default=1e-4, metadata={"help": "T"})
-    eps: float = field(default=1e-4, metadata={"help": ""})
+    init_a: float = field(default=1e-4, metadata={"help": "The initial weights"})
+    eps: float = field(default=1e-4, metadata={"help": "The control strength of COFT. The freedom of rotation."})
+    lamda: float = field(default=1e-4, metadata={"help": "The control strength of regularity"})
     add_orth: str = field(default='none', metadata={"help": ""})
     init_weights: Literal[True, "pissa"] = field(
         default=True,
@@ -155,14 +235,9 @@ def train():
     parser = transformers.HfArgumentParser(TrainingArguments)
     script_args = parser.parse_args_into_dataclasses()[0]
     print(script_args)
-    # local_rank = os.getenv("LOCAL_RANK")
-    # device_string = "cuda:" + str(local_rank)
-
     model = transformers.AutoModelForCausalLM.from_pretrained(
         script_args.model_name_or_path,
-        device_map="balanced",
-        # device_map={'':device_string}
-        # device_map="balanced_low_0"
+        device_map="auto",
     )
     if script_args.adapter_name_or_path is not None:
         print(f"Load {script_args.init_weights} from {script_args.adapter_name_or_path}: ", )
@@ -171,7 +246,7 @@ def train():
     elif script_args.hrft_r is not None:
         print(f"Initilized {script_args.init_weights} layers")
 
-        hra_config = HRAConfig(
+        hra_config = OFTConfig(
             r=script_args.hrft_r,
             eps=script_args.eps,
             init_weights=script_args.init_weights,
@@ -220,7 +295,7 @@ def train():
 
     data_collator = DataCollatorForSupervisedDataset(tokenizer=tokenizer)
     data_module = dict(train_dataset=train_dataset, data_collator=data_collator)
-    trainer = Trainer(model=model, tokenizer=tokenizer, args=script_args, **data_module)
+    trainer = MyTrainer(model=model, tokenizer=tokenizer, lamda=script_args.lamda,  args=script_args, **data_module)
     model.config.use_cache = False
     trainer.train()
     trainer.save_state()
@@ -228,4 +303,5 @@ def train():
 
 
 if __name__ == "__main__":
+
     train()

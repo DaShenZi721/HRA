@@ -1,4 +1,4 @@
-BASE_MODEL="/root/autodl-tmp/Finetune/Model/7B/"
+BASE_MODEL="/home/haotian_liu/Finetune/Model/7B/"
 OUTPUT="output/checkpoint"
 
 python merge_adapter_to_base_model.py --base_mode $BASE_MODEL --adapter $OUTPUT/ft/ --output_path $OUTPUT
