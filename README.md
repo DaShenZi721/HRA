@@ -85,7 +85,7 @@ pip install -r requirements.txt
 ```
 Please note that the peft package and transformer package must be downloaded with the versions consistent with those listed in the requirements file. 
 
-After completing the download, please replace the **oft** folder inside the `**peft/tuners** within your running environment's **python/site-packages** with the **oft** folder from the current directory.
+After completing the download, please replace the **oft** folder inside the **peft/tuners** within your running environment's **python/site-packages** with the **oft** folder from the current directory.
 
 The path for the oft folder in the environment should be:
 
