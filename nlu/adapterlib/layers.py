@@ -9,69 +9,49 @@ import torch.nn.functional as F
 import math
 from typing import Optional, List
 
-class HouseholderLinear(nn.Linear):
+class HRALinear(nn.Linear):
     def __init__(
         self, 
         in_features: int, 
         out_features: int, 
         config: dict,
-        fan_in_fan_out: bool = False, # Set this to True if the layer to replace stores weight like (fan_in, fan_out)
         **kwargs
     ):
         nn.Linear.__init__(self, in_features, out_features, **kwargs)
-        config = config.householder
-        self.l = config.l
-        self.eps = config.eps
-        self.init_a = config.init_a
-        self.add_orth = config.add_orth
-        self.dropout_rate = config.householder_dropout
-        self.gramschmidt = True if self.add_orth == 'gramschmidt' else False
-        # self.householder_U = nn.ParameterList([nn.Parameter(self.weight.new_zeros(in_features, 1)) for _ in range(self.l)])
-        # self.householder_U = nn.Parameter(
-        #     torch.cat([torch.eye(config.l, config.l), torch.zeros(in_features-config.l, config.l)], dim=0), 
-        #     requires_grad=True
-        # )
-        self.householder_U = nn.Parameter(torch.zeros(in_features, self.l),requires_grad=True)
-        nn.init.kaiming_uniform_(self.householder_U, a=math.sqrt(5))
-        # nn.init.kaiming_uniform_(self.householder_U, a=1/self.init_a)
-        self.weight.requires_grad = False
-        self.reset_parameters()
+        config = config.hra
+        self.r = config.r
+        self.apply_GS = config.apply_GS
         
-    def reset_parameters(self):
+        half_u = torch.zeros(self.in_features, self.r // 2)
+        nn.init.kaiming_uniform_(half_u, a=math.sqrt(5))
+        self.hra_u = nn.Parameter(torch.repeat_interleave(half_u, 2, dim=1), requires_grad=True)
+        
+        self.weight.requires_grad = False
         nn.Linear.reset_parameters(self)
-        # if hasattr(self, 'householder_U'):
-        #     for i in range(self.l):
-        #         nn.init.kaiming_uniform_(self.householder_U[i], a=1/self.init_a)
                 
     def train(self, mode: bool = True):
         nn.Linear.train(self, mode)
                 
     def forward(self, x):
-        weight = self.weight.data
-        
-        if self.gramschmidt:
-            U_list = [(self.householder_U[:, 0] / self.householder_U[:, 0].norm()).view(-1, 1)]
-            for i in range(1, self.l):
-                Ui = self.householder_U[:, i].view(-1, 1)
+        orig_weight = self.weight.data
+        if self.apply_GS:
+            weight = [(self.hra_u[:, 0] / self.hra_u[:, 0].norm()).view(-1, 1)]
+            for i in range(1, self.r):
+                ui = self.hra_u[:, i].view(-1, 1)
                 for j in range(i):
-                    Ui = Ui - (U_list[j].t() @ Ui) * U_list[j]
-                U_list.append((Ui / Ui.norm()).view(-1, 1))
-            U_list = torch.cat(U_list, dim=1)
-            weight = weight @ (torch.eye(self.in_features, device=x.device, dtype=x.dtype) - 2 * U_list @ U_list.t())
+                    ui = ui - (weight[j].t() @ ui) * weight[j]
+                weight.append((ui / ui.norm()).view(-1, 1))
+            weight = torch.cat(weight, dim=1)
+            new_weight = torch.mm(orig_weight, torch.eye(self.in_features, device=x.device, dtype=x.dtype) - 2 * weight @ weight.t())
             
         else:
-            # householder_U_norm = self.householder_U / torch.sqrt((torch.sum(self.householder_U ** 2,dim=0)+self.eps))
-            householder_U_norm = self.householder_U / self.householder_U.norm(dim=0)
-            for l in range(self.l):
-                unit_v = householder_U_norm[:, l].view(-1, 1)
-                weight = torch.mm(weight, torch.eye(self.in_features, device=x.device, dtype=x.dtype) - 2 * unit_v @ unit_v.t())
-            # householder_U_norm = self.householder_U / self.householder_U.norm(dim=0)
-            # for l in range(self.l):
-            #     unit_v = householder_U_norm[:, l].view(-1, 1)
-            #     x = x - 2 * (x @ unit_v) * unit_v.t()
+            new_weight = orig_weight
+            hra_u_norm = self.hra_u / self.hra_u.norm(dim=0)
+            for i in range(self.r):
+                ui = hra_u_norm[:, i].view(-1, 1)
+                new_weight = torch.mm(new_weight, torch.eye(self.in_features, device=x.device, dtype=x.dtype) - 2 * ui @ ui.t())
 
-        out = F.linear(input=x, weight=weight, bias=self.bias)
-        
+        out = F.linear(input=x, weight=new_weight, bias=self.bias)
         return out
 
 def project(R, eps):
@@ -486,5 +466,5 @@ class Conv3d(ConvLoRA):
 adapter_dict = {
     'lora': LoRALinear,
     'oft': OFTLinear,
-    'householder': HouseholderLinear,
+    'hra': HRALinear,
 }

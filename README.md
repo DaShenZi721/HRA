@@ -1,3 +1,26 @@
+
+# Bridging The Gap between Low-rank and Orthogonal Adaptation via Householder Reflection Adaptation
+
+<div align="center">
+  <img src="assets/OHRFT_scheme.png" width="1100"/>
+</div>
+
+<p align="center">
+  <a href="https://arxiv.org/abs/2405.17484">arXiv</a> 
+</p>
+
+
+
+## Introduction
+
+While following different technical routes, both low-rank and orthogonal adaptation techniques can efficiently adapt large-scale pre-training models in specific tasks or domains based on a small piece of trainable parameters. 
+In this study, we bridge the gap between these two techniques, proposing a simple but effective adaptation method based on Householder reflections. 
+Given a pre-trained model, our method fine-tunes its layers by multiplying each frozen weight matrix with an orthogonal matrix constructed by a chain of learnable Householder reflections (HRs).
+This HR-based orthogonal fine-tuning is equivalent to an adaptive low-rank adaptation. 
+Moreover, we show that the orthogonality of the reflection planes corresponding to the HRs impacts the model capacity and regularity. 
+The analysis motivates us to regularize the orthogonality of the HRs, leading to different implementations of the proposed Householder reflection adaptation~(HRA) method.
+Compared with state-of-the-art methods, HRA achieves superior performance with fewer learnable parameters when adapting large language models and conditional image generators. 
+
 ## Installation
 
 For nlu and generation, construct the virtual environment by Anaconda or Miniconda3:
@@ -9,6 +32,11 @@ conda env create -f env.yml
 
 
 ### Subject-driven Generation
+
+<div align="center">
+  <img src="assets/subject.png" width="700"/>
+</div>
+
 1. Similar to the example for [diffusers-dreambooth](https://github.com/huggingface/diffusers/tree/main/examples/dreambooth), you can run the finetuning using **HRA** with the following command. 
 Within the 'subject' folder, run the training script to run the result on the [dreambooth](https://github.com/google/dreambooth) dataset. [Dreambooth](https://github.com/google/dreambooth) dataset consists of 30 subjects, with 25 validation prompts each:
 ```bash
@@ -22,6 +50,10 @@ python true_eval_ablation.py
 ```
 
 ### Controllable Generation
+
+<div align="center">
+  <img src="assets/control.png" width="700"/>
+</div>
 
 #### Fine-tuning
 
@@ -61,9 +93,39 @@ python tools/test.py local_configs/segformer/B4/segformer.b4.512x512.ade.160k.py
 
 ### Natural Language Understanding
 
+<div align="center">
+  <img src="assets/figure_nlp.png" width="300"/>
+</div>
+
+We adapt [DeBERTaV3-base](https://arxiv.org/abs/2111.09543) and test the performance of the adapted models on  [General Language Understanding Evaluation (GLUE) benchmark](https://gluebenchmark.com/).
+
+#### Environment Setup
+
 ```bash
 cd nlu
-experiments/glue/mnli.sh deberta-v3-base
+conda env create -f env.yml
+```
+
+#### Prepare Dataset
+
+```bash
+cache_dir=/tmp/DeBERTa/
+cd experiments/glue
+./download_data.sh  $cache_dir/glue_tasks
+```
+
+#### Finetune
+
+```bash
+cd nlu
+experiments/glue/mnli.sh
+experiments/glue/cola.sh
+experiments/glue/mrpc.sh
+experiments/glue/qnli.sh
+experiments/glue/qqp.sh
+experiments/glue/rte.sh
+experiments/glue/sst2.sh
+experiments/glue/stsb.sh
 ```
 
 ### Mathematical reasoning
