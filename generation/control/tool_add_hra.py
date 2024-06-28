@@ -19,20 +19,18 @@ import torch
 from oldm.hack import disable_verbosity
 disable_verbosity()
 from oldm.model import create_model
-from householder import inject_trainable_householder, inject_trainable_householder_conv, inject_trainable_householder_extended
+from hra import inject_trainable_hra
 
 import argparse
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--input_path', type=str, default='./models/v1-5-pruned.ckpt')
-parser.add_argument('--output_path', type=str, default='./models/householder_none_l_8.ckpt')
-parser.add_argument('--l', type=int, default=8)
-parser.add_argument('--add_orth', type=str, default='none')
-# none, gramschmidt
-parser.add_argument('--eps', type=float, default=7e-6)
+parser.add_argument('--output_path', type=str, default='./models/hra_half_init_l_8.ckpt')
+parser.add_argument('--r', type=int, default=8)
+parser.add_argument('--apply_GS', action='store_true', default=False)
 args = parser.parse_args()
 
-# args.output_path = f'./models/householder_none_l_8.ckpt'
+# args.output_path = f'./models/hra_none_l_8.ckpt'
 
 assert os.path.exists(args.input_path), 'Input model does not exist.'
 # assert not os.path.exists(output_path), 'Output filename already exists.'
@@ -50,9 +48,7 @@ def get_node_name(name, parent_name):
 model = create_model(config_path='./configs/oft_ldm_v15.yaml')
 model.model.requires_grad_(False)
 
-unet_lora_params, train_names = inject_trainable_householder(model.model, l=args.l, eps=args.eps, add_orth=args.add_orth)
-# unet_lora_params, train_names = inject_trainable_householder_conv(model.model, r=args.r, eps=args.eps)
-# unet_lora_params, train_names = inject_trainable_householder_extended(model.model, r=args.r, eps=args.eps)
+unet_lora_params, train_names = inject_trainable_hra(model.model, r=args.r, apply_GS=args.apply_GS)
 
 pretrained_weights = torch.load(args.input_path)
 if 'state_dict' in pretrained_weights:
@@ -75,7 +71,7 @@ for k in scratch_dict.keys():
             target_dict[k] = scratch_dict[k].clone()
             print(f'These weights are newly added: {k}')
 
-with open('Householder_model_names.txt', 'w') as file:
+with open('HRA_model_names.txt', 'w') as file:
     for element in names:
         file.write(element + '\n')
 

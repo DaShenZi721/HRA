@@ -389,9 +389,9 @@ class AttnProcessor:
         return hidden_states
 
 
-class HouseholderLinearLayer(nn.Module):
-    def __init__(self, in_features, out_features, bias=False, eps=6e-5, l=1):
-        super(HouseholderLinearLayer, self).__init__()
+class HRALinearLayer(nn.Module):
+    def __init__(self, in_features, out_features, bias=False, r=8, apply_GS=False):
+        super(HRALinearLayer, self).__init__()
 
         self.in_features=in_features
         self.out_features=out_features
@@ -399,59 +399,64 @@ class HouseholderLinearLayer(nn.Module):
         self.register_buffer('cross_attention_dim', torch.tensor(in_features))
         self.register_buffer('hidden_size', torch.tensor(out_features))
         
-        self.l = l
-        self.eps = eps
-        self.v_list = nn.ParameterList()
-        for _ in range(l):
-            self.v_list.append(nn.Parameter(torch.zeros(in_features, 1), requires_grad=True))
-            nn.init.kaiming_uniform_(self.v_list[-1], a=1/eps)
+        self.r = r
+        self.apply_GS = apply_GS
         
-        # self.v_square = nn.Parameter(torch.zeros(in_features, 1), requires_grad=True)
-        
-        # self.tmp = None
-        
+        half_u = torch.zeros(in_features, r // 2)
+        nn.init.kaiming_uniform_(half_u, a=math.sqrt(5))
+        self.hra_u = nn.Parameter(torch.repeat_interleave(half_u, 2, dim=1), requires_grad=True)    
 
     def forward(self, attn, x):
-        orig_dtype = x.dtype
-        dtype = self.v_list[0].dtype
+        # orig_dtype = x.dtype
+        # dtype = self.v_list[0].dtype
         
-        unit_v_list = [v / (torch.sqrt(torch.sum(v ** 2) + self.eps)) for v in self.v_list]
+        # unit_v_list = [v / (torch.sqrt(torch.sum(v ** 2) + self.eps)) for v in self.v_list]
         
-        # if self.tmp is not None:           
-        #     print('self.v_list[0][:5] - self.tmp[:5]')
-        #     print(self.v_list[0][:5] - self.tmp[:5])
-        # self.tmp = self.v_list[0].clone()
+        # filt = attn.weight.data.to(dtype)
+        # for unit_v in unit_v_list:
+        #     filt = torch.mm(filt, torch.eye(self.in_features, device=x.device) - 2 * unit_v @ unit_v.t())
+        #     # filt = torch.mm(filt, torch.eye(self.in_features, device=x.device) + self.v_square)
         
-        # if self.tmp is not None:           
-        #     print('self.v_square[:5, :5] - self.tmp[:5, :5]')
-        #     print(self.v_square[:5, :5] - self.tmp[:5, :5])
-        # self.tmp = self.v_square.clone()
-        
-        filt = attn.weight.data.to(dtype)
-        for unit_v in unit_v_list:
-            filt = torch.mm(filt, torch.eye(self.in_features, device=x.device) - 2 * unit_v @ unit_v.t())
-            # filt = torch.mm(filt, torch.eye(self.in_features, device=x.device) + self.v_square)
-        
-        bias_term = attn.bias.data if attn.bias is not None else None
-        if bias_term is not None:
-            bias_term = bias_term.to(orig_dtype)
+        # bias_term = attn.bias.data if attn.bias is not None else None
+        # if bias_term is not None:
+        #     bias_term = bias_term.to(orig_dtype)
             
-        out = nn.functional.linear(input=x.to(orig_dtype), weight=filt.to(orig_dtype), bias=bias_term)
+        # out = nn.functional.linear(input=x.to(orig_dtype), weight=filt.to(orig_dtype), bias=bias_term)
         
+        # return out
+        orig_weight = attn.weight.data
+        if self.apply_GS:
+            weight = [(self.hra_u[:, 0] / self.hra_u[:, 0].norm()).view(-1, 1)]
+            for i in range(1, self.r):
+                ui = self.hra_u[:, i].view(-1, 1)
+                for j in range(i):
+                    ui = ui - (weight[j].t() @ ui) * weight[j]
+                weight.append((ui / ui.norm()).view(-1, 1))
+            weight = torch.cat(weight, dim=1)
+            new_weight = orig_weight @ (torch.eye(self.in_features, device=x.device) - 2 * weight @ weight.t())
+            
+        else:
+            new_weight = orig_weight
+            hra_u_norm = self.hra_u / self.hra_u.norm(dim=0)
+            for i in range(self.r):
+                ui = hra_u_norm[:, i].view(-1, 1)
+                new_weight = torch.mm(new_weight, torch.eye(self.in_features, device=x.device) - 2 * ui @ ui.t())
+
+        out = nn.functional.linear(input=x, weight=new_weight, bias=attn.bias)
         return out
 
-class HouseholderAttnProcessor(nn.Module):
-    def __init__(self, hidden_size, cross_attention_dim=None, eps=2e-5, l=1):
+class HRAAttnProcessor(nn.Module):
+    def __init__(self, hidden_size, cross_attention_dim=None, r=8, apply_GS=False):
         super().__init__()
 
         self.hidden_size = hidden_size
         self.cross_attention_dim = cross_attention_dim
-        self.l = l
+        self.r = r
         
-        self.to_q_householder = HouseholderLinearLayer(hidden_size, hidden_size, eps=eps, l=l)
-        self.to_k_householder = HouseholderLinearLayer(cross_attention_dim or hidden_size, hidden_size, eps=eps, l=l)
-        self.to_v_householder = HouseholderLinearLayer(cross_attention_dim or hidden_size, hidden_size, eps=eps, l=l)
-        self.to_out_householder = HouseholderLinearLayer(hidden_size, hidden_size, eps=eps, l=l)
+        self.to_q_hra = HRALinearLayer(hidden_size, hidden_size, r=r, apply_GS=apply_GS)
+        self.to_k_hra = HRALinearLayer(cross_attention_dim or hidden_size, hidden_size, r=r, apply_GS=apply_GS)
+        self.to_v_hra = HRALinearLayer(cross_attention_dim or hidden_size, hidden_size, r=r, apply_GS=apply_GS)
+        self.to_out_hra = HRALinearLayer(hidden_size, hidden_size, r=r, apply_GS=apply_GS)
 
     def __call__(self, attn: Attention, hidden_states, encoder_hidden_states=None, attention_mask=None, scale=1.0):
         batch_size, sequence_length, _ = (
@@ -461,7 +466,7 @@ class HouseholderAttnProcessor(nn.Module):
 
         # query = attn.to_q(hidden_states) + scale * self.to_q_lora(hidden_states)
         
-        query = self.to_q_householder(attn.to_q, hidden_states)
+        query = self.to_q_hra(attn.to_q, hidden_states)
         query = attn.head_to_batch_dim(query)
 
         if encoder_hidden_states is None:
@@ -470,9 +475,9 @@ class HouseholderAttnProcessor(nn.Module):
             encoder_hidden_states = attn.norm_encoder_hidden_states(encoder_hidden_states)
 
         # key = attn.to_k(encoder_hidden_states) + scale * self.to_k_lora(encoder_hidden_states)
-        key = self.to_k_householder(attn.to_k, encoder_hidden_states)
+        key = self.to_k_hra(attn.to_k, encoder_hidden_states)
         # value = attn.to_v(encoder_hidden_states) + scale * self.to_v_lora(encoder_hidden_states)
-        value = self.to_v_householder(attn.to_v, encoder_hidden_states)
+        value = self.to_v_hra(attn.to_v, encoder_hidden_states)
 
         key = attn.head_to_batch_dim(key)
         value = attn.head_to_batch_dim(value)
@@ -483,7 +488,7 @@ class HouseholderAttnProcessor(nn.Module):
 
         # linear proj
         # hidden_states = attn.to_out[0](hidden_states) + scale * self.to_out_lora(hidden_states)
-        hidden_states = self.to_out_householder(attn.to_out[0], hidden_states)
+        hidden_states = self.to_out_hra(attn.to_out[0], hidden_states)
         # dropout
         hidden_states = attn.to_out[1](hidden_states)
 
@@ -1027,5 +1032,5 @@ AttentionProcessor = Union[
     SlicedAttnAddedKVProcessor,
     AttnAddedKVProcessor2_0,
     OFTAttnProcessor,
-    HouseholderAttnProcessor
+    HRAAttnProcessor
 ]

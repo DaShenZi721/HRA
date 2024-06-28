@@ -46,7 +46,7 @@ from diffusers import (
     UNet2DConditionModel,
 )
 from diffusers.loaders import AttnProcsLayers
-from oft_utils.attention_processor import HouseholderAttnProcessor
+from oft_utils.attention_processor import HRAAttnProcessor
 from diffusers.optimization import get_scheduler
 from diffusers.utils import check_min_version, is_wandb_available
 from diffusers.utils.import_utils import is_xformers_available
@@ -114,7 +114,7 @@ def parse_args(input_args=None):
     parser.add_argument(
         "--pretrained_model_name_or_path",
         type=str,
-        default='/home/HRA/huggingface_aliendao/aliendao/dataroot/models/runwayml/stable-diffusion-v1-5',
+        default='runwayml/stable-diffusion-v1-5',
         help="Path to pretrained model or model identifier from huggingface.co/models.",
     )
     parser.add_argument(
@@ -204,7 +204,7 @@ def parse_args(input_args=None):
     parser.add_argument(
         "--output_dir",
         type=str,
-        default="log_householder/backpack-0",
+        default="log_hra/backpack-0",
         help="The output directory where the model predictions and checkpoints will be written.",
     )
     parser.add_argument(
@@ -420,29 +420,21 @@ def parse_args(input_args=None):
         ),
     )
     parser.add_argument(
-        "--eps",
-        type=float,
-        default=6e-5,
+        "--hra_r",
+        type=int,
+        default=8,
         help=(
-            "The control strength of COFT. The freedom of rotation. Only has an effect if args.coft is set to True."
+            "The rank of HRA across different layers. It is best to set 'r' to an even number; otherwise, the default            initialization method will not work."
         ),
     )
     parser.add_argument(
-        "--l",
-        type=int,
-        default=1,
+        "--hra_apply_GS",
+        action='store_true',
+        default=False,
         help=(
-            "The number of Householder reflector layers."
+            "Whether to apply Gram-Schmidt orthogonalization."
         ),
     )
-    # parser.add_argument(
-    #     "--coft",
-    #     action='store_true',
-    #     default=False,
-    #     help=(
-    #         "The constrainted variant of OFT."
-    #     )
-    # )
     if input_args is not None:
         args = parser.parse_args(input_args)
     else:
@@ -773,7 +765,7 @@ def main(args):
             block_id = int(name[len("down_blocks.")])
             hidden_size = unet.config.block_out_channels[block_id]
 
-        oft_attn_procs[name] = HouseholderAttnProcessor(hidden_size=hidden_size, cross_attention_dim=cross_attention_dim, eps=args.eps, l=args.l)
+        oft_attn_procs[name] = HRAAttnProcessor(hidden_size=hidden_size, cross_attention_dim=cross_attention_dim, r=args.hra_r, apply_GS=args.hra_apply_GS)
 
     unet.set_attn_processor(oft_attn_procs)
     print(f'Total parameters requiring grad: {sum([p.numel() for p in unet.parameters() if p.requires_grad == True])}')
@@ -914,8 +906,8 @@ def main(args):
     # mhe = MHE(unet, eps=args.eps, r=args.r)
     # mhe_loss = mhe.calculate_mhe()
     # accelerator.log({"mhe_loss": mhe_loss}, step=0)
-    accelerator.log({"eps": args.eps}, step=0)
-    accelerator.log({"l": args.l}, step=0)
+    accelerator.log({"hra_r": args.hra_r}, step=0)
+    accelerator.log({"hra_apply_GS": args.hra_apply_GS}, step=0)
     # accelerator.log({"COFT": 1 if args.coft else 0}, step=0)
 
     for epoch in range(first_epoch, args.num_train_epochs):

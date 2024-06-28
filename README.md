@@ -18,68 +18,146 @@ In this study, we bridge the gap between these two techniques, proposing a simpl
 Given a pre-trained model, our method fine-tunes its layers by multiplying each frozen weight matrix with an orthogonal matrix constructed by a chain of learnable Householder reflections (HRs).
 This HR-based orthogonal fine-tuning is equivalent to an adaptive low-rank adaptation. 
 Moreover, we show that the orthogonality of the reflection planes corresponding to the HRs impacts the model capacity and regularity. 
-The analysis motivates us to regularize the orthogonality of the HRs, leading to different implementations of the proposed Householder reflection adaptation~(HRA) method.
+The analysis motivates us to regularize the orthogonality of the HRs, leading to different implementations of the proposed Householder reflection adaptation (HRA) method.
 Compared with state-of-the-art methods, HRA achieves superior performance with fewer learnable parameters when adapting large language models and conditional image generators. 
 
-## Installation
-
-For nlu and generation, construct the virtual environment by Anaconda or Miniconda3:
-```bash
-conda env create -f env.yml
-```
 
 ## Usage
 
+we adapted pre-trained Stable Diffusion (SD) for subject-driven generation and controllable generation, respectively.
 
 ### Subject-driven Generation
 
 <div align="center">
-  <img src="assets/subject.png" width="700"/>
+  <img src="assets/subject.png" width="600"/>
 </div>
 
-1. Similar to the example for [diffusers-dreambooth](https://github.com/huggingface/diffusers/tree/main/examples/dreambooth), you can run the finetuning using **HRA** with the following command. 
-Within the 'subject' folder, run the training script to run the result on the [dreambooth](https://github.com/google/dreambooth) dataset. [Dreambooth](https://github.com/google/dreambooth) dataset consists of 30 subjects, with 25 validation prompts each:
+Given several images of a specific subject and a textual prompt, subject-driven generation aims to generate images of the same subject in a context aligning with the prompt.
+
+#### Environment Setup 
+
 ```bash
-cd subject
-./train_dreambooth_householder.sh
+cd generation
+conda env create -f env.yml
 ```
 
-1. We also provide the evaluation scripts:
+#### Prepare Dataset
+
+Download [dreambooth](https://github.com/google/dreambooth) dataset by running this script.
+
 ```bash
-python true_eval_ablation.py
+cd subject
+bash download_dreambooth.sh
+```
+
+After downloading the data, your directory structure should look like this:
+
+```
+dreambooth
+├── dataset
+│   ├── backpack
+│   └── backpack_dog
+│       ...
+```
+
+You can also put your custom images into `dreambooth/dataset`.
+
+#### Finetune
+
+```bash
+prompt_idx=0
+class_idx=0
+./train_dreambooth.sh $prompt_idx $class_idx
+```
+
+where the `$prompt_idx` corresponds to different prompts ranging from 0 to 24 and the `$class_idx` corresponds to different subjects ranging from 0 to 29.
+
+Launch the training script with `accelerate` and pass hyperparameters, as well as LoRa-specific arguments to it such as:
+
+- `use_hra`: Enables HRA in the training script.
+- `hra_r`: the number of HRs (i.e., r) across different layers, expressed in `int`. 
+As r increases, the number of trainable parameters increases, which generally leads to improved performance.
+However, this also results in higher memory consumption and longer computation times. 
+Therefore, r is usually set to 8.
+**Note**, please set r to an even number to avoid potential issues during initialization.
+- `hra_apply_GS`: Applys Gram-Schmidt orthogonalization. Default is `false`.
+- `hra_bias`: specify if the `bias` paramteres should be traind. Can be `none`, `all` or `hra_only`.
+
+#### Evaluation
+
+```bash
+python evaluate.py
+python get_result.py
 ```
 
 ### Controllable Generation
 
 <div align="center">
-  <img src="assets/control.png" width="700"/>
+  <img src="assets/control.png" width="650"/>
 </div>
+
+Controllable generation aims to generate images aligning with a textual prompt and additional control signals (such as facial landmark annotations, canny edges, and segmentation maps).
+
+#### Prepare Dataset
+
+Download ADE20K and CelebA-HQ datasets by running this script.
+
+```bash
+cd control
+bash download_ade20k.sh
+bash download_celebhq.sh
+```
+
+For COCO dataset, we follow [OFT](https://github.com/Zeju1997/oft) to download and preprocess it.
+
+After downloading the data, your directory structure should look like this:
+
+```
+data
+├── ADE20K
+│ ├── train
+│ │ ├── color
+│ │ ├── segm
+│ │ └── prompt_train_blip.json
+│ └── val
+│ │ ├── color
+│ │ ├── segm
+│ │ └── prompt_val_blip.json
+└── COCO
+│ ├── train
+│ │ ├── color
+│ │ ├── depth
+...
+```
+
+#### Prepare pre-trained model
+
+Download the pre-trained model weights [v1-5-pruned.ckpt](https://huggingface.co/runwayml/stable-diffusion-v1-5/tree/main) and save it in the `models` directory.
 
 #### Fine-tuning
 
 1. Create the model with additional **HRA** parameters:
 ```bash
-cd control
-python tool_add_householder.py \
+python tool_add_hra.py \
   --input_path=./models/v1-5-pruned.ckpt \
-  --output_path=./models/householder_l_8.ckpt \
-  --l=8 
+  --output_path=./models/hra_r_8.ckpt \
+  --r=8 
 ```
 2. Specify the control signal and dataset. Train the model specify the same hyperparameters as above:
 ```bash
 python train.py \
-  --l=8 \
-  --control=canny
+  --r=8 \
+  --control=segm
 ```
 
 #### Generation
 1. After finetuning with **HRA**, run inference to generate images based on control signal. Because the inference takes some time, to perform large scale evaluation, we split the dataset into different sub-datasets and run inference on multiple gpus:
 ```bash
-python test_householder_parallel.py 
-  --l=8 \
-  --control=canny
+python generation.py 
+  --r=8 \
+  --control=segm
 ```
-1. To evaluate **HRA** results on the three tasks listed in the paper (landmark-to-image (L2I), canny-to-image (C2I) and segmentation map-to-image (S2I)), run the following scripts on the generated images.
+1. To evaluate **HRA** results on the three tasks: canny edge to image (C2I) on the COCO dataset, landmark to face (L2F) on the CelebA-HQ dataset, and segmentation map to image (S2I) on the ADE20K dataset, run the following scripts on the generated images.
 ```bash
 python eval_landmark.py
 ```
@@ -106,7 +184,15 @@ cd nlu
 conda env create -f env.yml
 ```
 
+Before fine-tuning, you need to install the dependencies.
+
+```bash
+python setup.py install
+```
+
 #### Prepare Dataset
+
+Run this scipt to download glue dataset.
 
 ```bash
 cache_dir=/tmp/DeBERTa/
@@ -116,16 +202,17 @@ cd experiments/glue
 
 #### Finetune
 
+Run tasks.
+
 ```bash
-cd nlu
-experiments/glue/mnli.sh
-experiments/glue/cola.sh
-experiments/glue/mrpc.sh
-experiments/glue/qnli.sh
-experiments/glue/qqp.sh
-experiments/glue/rte.sh
-experiments/glue/sst2.sh
-experiments/glue/stsb.sh
+./mnli.sh 
+./cola.sh
+./mrpc.sh
+./qnli.sh
+./qqp.sh
+./rte.sh
+./sst2.sh
+./stsb.sh
 ```
 
 ### Mathematical reasoning

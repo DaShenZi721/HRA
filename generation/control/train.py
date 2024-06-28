@@ -19,7 +19,7 @@ from oldm.model import create_model, load_state_dict
 from dataset.utils import return_dataset
 
 from oft import inject_trainable_oft, inject_trainable_oft_conv, inject_trainable_oft_extended, inject_trainable_oft_with_norm
-from householder import inject_trainable_householder, inject_trainable_householder_conv, inject_trainable_householder_extended, inject_trainable_householder_with_norm
+from hra import inject_trainable_hra
 from lora import inject_trainable_lora
 
 import argparse
@@ -27,36 +27,34 @@ import argparse
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument('--l', type=int, default=8)
-parser.add_argument('--add_orth', type=str, default='none')
-# none, gramschmidt
-parser.add_argument('--r', type=int, default=4)
-parser.add_argument('--eps', 
-                    type=float, 
-                    default=7e-6,
-                    )
-parser.add_argument('--coft', action="store_true", default=True)
-parser.add_argument('--block_share', action="store_true", default=False)
+# HRA
+parser.add_argument('--hra_r', type=int, default=8)
+parser.add_argument('--hra_apply_GS', action='store_true', default=False)
+parser.add_argument('--hra_lamb', type=float, default=0.0)
+
+# OFT
+parser.add_argument('--oft_r', type=int, default=4)
+parser.add_argument('--oft_eps', type=float, default=7e-6)
+parser.add_argument('--oft_coft', action="store_true", default=True)
+parser.add_argument('--oft_block_share', action="store_true", default=False)
+
 parser.add_argument('--batch_size', type=int, default=8)
 parser.add_argument('--num_samples', type=int, default=1)
 parser.add_argument('--plot_frequency', type=int, default=100)
-parser.add_argument('--learning_rate', 
-                    type=float, 
-                    default=3e-5,
-                    )
+parser.add_argument('--learning_rate', type=float, default=9e-4)
 parser.add_argument('--sd_locked', action="store_true", default=True)
 parser.add_argument('--only_mid_control', action="store_true", default=False)
 parser.add_argument('--num_gpus', type=int, default=torch.cuda.device_count())
 parser.add_argument('--resume_path', 
                     type=str, 
-                    default='./models/householder_none_l_8.ckpt',
+                    default='./models/hra_half_init_l_8.ckpt',
                     )
 parser.add_argument('--time_str', type=str, default=datetime.now().strftime("%Y-%m-%d-%H-%M-%S-%f"))
 parser.add_argument('--num_workers', type=int, default=8)
 parser.add_argument('--control', 
                     type=str, 
                     help='control signal. Options are [segm, sketch, densepose, depth, canny, landmark]', 
-                    default="landmark")
+                    default="segm")
 
 args = parser.parse_args()
 
@@ -86,9 +84,12 @@ if __name__ == "__main__":
     print(f'data_name: {data_name}\nlogger_freq: {logger_freq}\nmax_epochs: {max_epochs}')
     
     if 'oft' in args.resume_path:
-        experiment = 'oft_{}_{}_eps_{}_pe_diff_mlp_r_{}_{}gpu_{}'.format(data_name, control, args.eps, args.r, num_gpus, time_str)
-    elif 'householder' in args.resume_path:
-        experiment = 'householder_{}_{}_{}_eps_{}_pe_diff_mlp_l_{}_{}gpu_{}'.format(args.add_orth, data_name, control, args.eps, args.l, num_gpus, time_str)
+        experiment = 'oft_{}_{}_eps_{}_pe_diff_mlp_r_{}_{}gpu_{}'.format(data_name, control, args.oft_eps, args.oft_r, num_gpus, time_str)
+    elif 'hra' in args.resume_path:
+        if args.hra_apply_GS:
+            experiment = 'hra_apply_GS_{}_{}_pe_diff_mlp_r_{}_{}gpu_{}'.format(data_name, control, args.hra_r, num_gpus, time_str)
+        else:
+            experiment = 'hra_{}_{}_pe_diff_mlp_r_{}_lambda_{}_lr_{}_{}gpu_{}'.format(data_name, control, args.hra_r,  args.hra_lamb, args.learning_rate, num_gpus, time_str)
     elif 'lora' in args.resume_path:
         experiment = 'lora_{}_{}_pe_diff_mlp_r_{}_{}gpu_{}'.format(data_name, control, args.r, num_gpus, time_str)
 
@@ -99,9 +100,9 @@ if __name__ == "__main__":
 
     # inject trainable oft parameters
     if 'oft' in args.resume_path:
-        unet_lora_params, train_names = inject_trainable_oft(model.model, r=args.r, eps=args.eps, is_coft=args.coft, block_share=args.block_share)
-    elif 'householder' in args.resume_path:
-        unet_lora_params, train_names = inject_trainable_householder(model.model, l=args.l, eps=args.eps, add_orth=args.add_orth)
+        unet_lora_params, train_names = inject_trainable_oft(model.model, r=args.oft_r, eps=args.oft_eps, is_coft=args.oft_coft, block_share=args.oft_block_share)
+    elif 'hra' in args.resume_path:
+        unet_lora_params, train_names = inject_trainable_hra(model.model, r=args.hra_r, apply_GS=args.hra_apply_GS)
     elif 'lora' in args.resume_path:
         unet_lora_params, train_names = inject_trainable_lora(model.model, rank=args.r, network_alpha=None)
     

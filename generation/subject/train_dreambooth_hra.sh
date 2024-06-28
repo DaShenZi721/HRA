@@ -1,6 +1,10 @@
-# export MODEL_NAME="runwayml/stable-diffusion-v1-5"
-export MODEL_NAME="/home/HRA/huggingface_aliendao/aliendao/dataroot/models/runwayml/stable-diffusion-v1-5"
-export HF_HOME='/tmp'
+
+prompt_idx=$1
+class_idx=$2
+lr=1e-4
+hra_r=8
+
+export MODEL_NAME="runwayml/stable-diffusion-v1-5"
 
 # Define the unique_token, class_tokens, and subject_names
 unique_token="qwe"
@@ -21,25 +25,6 @@ class_tokens=(
     "toy" "glasses" "toy" "toy" "cartoon"
     "toy" "sneaker" "teapot" "vase" "stuffed animal"
 )
-
-for ((i=0; i<30; i++)); do
-    sequence=$(seq 0 24)
-    shuffled_sequence=$(shuf -e $sequence)
-    eval "sequence_$i=($shuffled_sequence)"
-done
-
-for ((j=0; j<25; j++)); do
-for ((i=0; i<30; i++)); do
-    
-eval "current_sequence=(\${sequence_$i[@]})"
-
-# # prompt_idx=$((idx % 25))
-# # class_idx=$((idx / 25))
-prompt_idx=${current_sequence[$j]}
-class_idx=$i
-eps=7e-6
-lr=7e-6
-l=7
 
 echo "prompt_idx: $prompt_idx, class_idx: $class_idx"
 
@@ -168,22 +153,15 @@ name="${selected_subject}-${prompt_idx}"
 instance_prompt="a photo of ${unique_token} ${class_token}"
 class_prompt="a photo of ${class_token}"
 
-export OUTPUT_DIR="log_householder/eps_${eps}_lr_${lr}/l_${l}/${name}"
-export INSTANCE_DIR="../data/dreambooth/${selected_subject}"
-export CLASS_DIR="data/class_data/${class_token}"
+export OUTPUT_DIR="log_hra/lr_${lr}_r_${hra_r}/${name}"
+export INSTANCE_DIR="dreambooth/dataset/${selected_subject}"
+export CLASS_DIR="class_data/${class_token}"
 
 if [ -d "$OUTPUT_DIR" ]; then
     echo "该目录已存在：$OUTPUT_DIR"
-    continue
 fi
 
-. /home/HRA/miniconda3/etc/profile.d/conda.sh
-conda activate oft
-
-# max_train_steps=600 - 1400
-# learning_rate=6e-5 
-
-accelerate launch train_dreambooth_householder.py \
+accelerate launch train_dreambooth_hra.py \
   --pretrained_model_name_or_path=$MODEL_NAME  \
   --instance_data_dir=$INSTANCE_DIR \
   --class_data_dir="$CLASS_DIR" \
@@ -205,8 +183,4 @@ accelerate launch train_dreambooth_householder.py \
   --seed="0" \
   --name="$name" \
   --num_class_images=200 \
-  --eps=$eps \
-  --l=$l
-
-done
-done
+  --hra_r=$hra_r 

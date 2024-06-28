@@ -248,14 +248,11 @@ class PairwiseImageDatasetLPIPS(Dataset):
 def clip_text(subject_name, image_dir):
     criterion = 'clip_text'
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    # model = CLIPModel.from_pretrained("openai/clip-vit-large-patch14").to(device)
-    model = CLIPModel.from_pretrained("/home/shen_yuan/OFT/oft/huggingface_models/clip-vit-large-patch14").to(device)
+    model = CLIPModel.from_pretrained("openai/clip-vit-large-patch14").to(device)
     # Get the text features
-    # tokenizer = AutoTokenizer.from_pretrained("openai/clip-vit-large-patch14")
-    tokenizer = AutoTokenizer.from_pretrained("/home/shen_yuan/OFT/oft/huggingface_models/clip-vit-large-patch14")
+    tokenizer = AutoTokenizer.from_pretrained("openai/clip-vit-large-patch14")
     # Get the image features
-    # processor = AutoProcessor.from_pretrained("openai/clip-vit-large-patch14")
-    processor = AutoProcessor.from_pretrained("/home/shen_yuan/OFT/oft/huggingface_models/clip-vit-large-patch14")
+    processor = AutoProcessor.from_pretrained("openai/clip-vit-large-patch14")
 
     epochs = sorted([int(epoch) for epoch in os.listdir(image_dir)])
     best_mean_similarity = 0
@@ -294,14 +291,12 @@ def clip_text(subject_name, image_dir):
     return mean_similarity_list
 
 
-def clip_image(subject_name, image_dir, dreambooth_dir='../data/dreambooth'):
+def clip_image(subject_name, image_dir, dreambooth_dir='dreambooth/dataset'):
     criterion = 'clip_image'
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    # model = CLIPModel.from_pretrained("openai/clip-vit-large-patch14").to(device)
-    model = CLIPModel.from_pretrained("/home/shen_yuan/OFT/oft/huggingface_models/clip-vit-large-patch14").to(device)
+    model = CLIPModel.from_pretrained("openai/clip-vit-large-patch14").to(device)
     # Get the image features
-    # processor = AutoProcessor.from_pretrained("openai/clip-vit-large-patch14")
-    processor = AutoProcessor.from_pretrained("/home/shen_yuan/OFT/oft/huggingface_models/clip-vit-large-patch14")
+    processor = AutoProcessor.from_pretrained("openai/clip-vit-large-patch14")
 
     epochs = sorted([int(epoch) for epoch in os.listdir(image_dir)])
     best_mean_similarity = 0
@@ -339,13 +334,11 @@ def clip_image(subject_name, image_dir, dreambooth_dir='../data/dreambooth'):
     return mean_similarity_list
 
 
-def dino(subject_name, image_dir, dreambooth_dir='../data/dreambooth'):
+def dino(subject_name, image_dir, dreambooth_dir='dreambooth/dataset'):
     criterion = 'dino'
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    # model = ViTModel.from_pretrained('facebook/dino-vits16').to(device)
-    # feature_extractor = ViTFeatureExtractor.from_pretrained('facebook/dino-vits16')
-    model = ViTModel.from_pretrained('/home/shen_yuan/OFT/oft/models/dino-vits16').to(device)
-    feature_extractor = ViTFeatureExtractor.from_pretrained('/home/shen_yuan/OFT/oft/models/dino-vits16')
+    model = ViTModel.from_pretrained('facebook/dino-vits16').to(device)
+    feature_extractor = ViTFeatureExtractor.from_pretrained('facebook/dino-vits16')
 
     epochs = sorted([int(epoch) for epoch in os.listdir(image_dir)])
     best_mean_similarity = 0
@@ -382,7 +375,7 @@ def dino(subject_name, image_dir, dreambooth_dir='../data/dreambooth'):
     return mean_similarity_list
 
 
-def lpips_image(subject_name, image_dir, dreambooth_dir='../data/dreambooth'):
+def lpips_image(subject_name, image_dir, dreambooth_dir='dreambooth/dataset'):
     criterion = 'lpips_image'
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # Set up the LPIPS model (vgg=True uses the VGG-based model from the paper)
@@ -413,48 +406,10 @@ def lpips_image(subject_name, image_dir, dreambooth_dir='../data/dreambooth'):
         mean_similarity_list.append(mean_similarity)
         print(f'epoch: {epoch}, criterion: LPIPS distance, mean_similarity: {mean_similarity}({best_mean_similarity})')
 
-    return mean_similarity_list
-
-
-def slice_window(subject_result):
-    window_len = 0
-    
-    def get_metric_window(metric_result):
-        max_idx = np.argmax(metric_result)
-        metric_window_left = max_idx - window_len//2
-        metric_window_right = max_idx + window_len//2 + 1
-        if metric_window_left < 0:
-            metric_window_right += -metric_window_left
-        if metric_window_right > len(metric_result):
-            metric_window_left -= metric_window_right - len(metric_result)
-        metric_window = list(range(max(metric_window_left, 0), min(metric_window_right, len(metric_result))))
-        
-        return metric_window
-        
-    while True:
-        result_window_list = []
-        metric_result_list = []
-        for metric, metric_result in subject_result.items():
-            metric_window = get_metric_window(metric_result)
-            result_window_list.append(metric_window)
-            metric_result_list.append(metric_result)
-            
-        result_window = reduce(np.intersect1d, result_window_list)
-        if len(result_window) == 0:
-            window_len += 1
-        else:
-            break
-        
-    final_result = []
-    for i in result_window:
-        final_result.append([metric_result[i] for metric_result in metric_result_list])
-            
-    return result_window.tolist(), final_result
-        
-    
+    return mean_similarity_list        
     
 if __name__ == "__main__":
-    image_dir = '/home/shen_yuan/OFT/oft/oft-db/log_householder/eps_7e-6_lr_7e-6/l_7'
+    image_dir = 'log_hra/lr_1e-4_r_8/'
     
     subject_dirs, subject_names = [], []
     for name in os.listdir(image_dir):
@@ -463,13 +418,11 @@ if __name__ == "__main__":
             subject_names.append(name)
     
     results_path = os.path.join(image_dir, 'true_results.json')
-    results_window_path = os.path.join(image_dir, 'true_results_window.json')
-    results_final_path = os.path.join(image_dir, 'true_results_final.json')
     # {'backpack-0':{'DINO':[x, ...], 'CLIP-I':[x, ...], 'CLIP-T':[x, ...], 'LPIPS':[x, ...],}}
     
     results_dict = dict()
-    if os.path.exists(results_final_path):
-        with open(results_final_path, 'r') as f:
+    if os.path.exists(results_path):
+        with open(results_path, 'r') as f:
             results = f.__iter__()
             while True:
                 try:
@@ -480,7 +433,6 @@ if __name__ == "__main__":
                     print("finish extraction.")
                     break
     
-    final_result_list = []
     for idx in range(len(subject_names)):
         subject_name = subject_names[idx]
         subject_dir = subject_dirs[idx]
@@ -494,30 +446,15 @@ if __name__ == "__main__":
         clip_t_sim = clip_text(subject_name, subject_dir)
         lpips_sim = lpips_image(subject_name, subject_dir)
 
-        try:
-            subject_result = {'DINO': dino_sim, 'CLIP-I': clip_i_sim, 'CLIP-T': clip_t_sim, 'LPIPS': lpips_sim}
-            result_window, final_result = slice_window(subject_result)           
-        except:
-            print('Found error!')
-            continue
-        
+        subject_result = {'DINO': dino_sim, 'CLIP-I': clip_i_sim, 'CLIP-T': clip_t_sim, 'LPIPS': lpips_sim}
         print(subject_result)
-        
-        final_result_list.append(final_result[0])
     
         with open(results_path,'a') as f:
             json_string = json.dumps({subject_name: subject_result})
             f.write(json_string + "\n")
-        with open(results_window_path,'a') as f:
-            json_string = json.dumps({subject_name: result_window})
-            f.write(json_string + "\n")
-        with open(results_final_path,'a') as f:
-            json_string = json.dumps({subject_name: final_result})
-            f.write(json_string + "\n")
+
     
-    with open(results_final_path,'a') as f:
-        json_string = json.dumps({'summary': np.mean(final_result_list, axis=0)})
-        f.write(json_string + "\n")
+
     
         
         
