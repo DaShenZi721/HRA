@@ -155,11 +155,11 @@ class DistributedTrainer:
       
       if n_epoch == self.training_epochs - 1:
         self.dump_interval = min(1000, self.dump_interval)
-      
-      # for name, param in self.model.named_parameters():
-      #   if name == 'deberta.encoder.layer.0.attention.self.query_proj.householder_v_list.0':
-      #     print(name)
-      #     print(param.data)
+        
+      # for n,v in self.model.named_parameters():
+      #   if n == 'deberta.encoder.layer.0.attention.self.query_proj.hra_u.0':
+      #     print(v[:5])
+      #     print((v/v.norm())[:5])
 
   def save_model(self, args, checkpoint_dir, chk_postfix, model, optimizer):
     save_path= os.path.join(checkpoint_dir, f'pytorch.model-{chk_postfix}.bin')
@@ -241,12 +241,12 @@ class DistributedTrainer:
         forward_outputs.append(output)
         loss = loss/len(data_chunks)
         # ------------------------------------------------------------------------------
-        for name, param in self.model.named_parameters():
-          if 'householder_U' in name:
-            device = param.device
-            householder_U_norm = param / param.norm(dim=0)
-            orth_loss = torch.norm(torch.eye(8, device=device) - householder_U_norm.t() @ householder_U_norm)
-            loss =  loss + 1e-6 * orth_loss
+        # for name, param in self.model.named_parameters():
+        #   if 'hra_u' in name:
+        #     device = param.device
+        #     hra_u_norm = param / param.norm(dim=0)
+        #     orth_loss = torch.norm(torch.eye(8, device=device) - hra_u_norm.t() @ hra_u_norm)
+        #     loss =  loss + 1e-6 * orth_loss
         # ------------------------------------------------------------------------------
         if i == 0:
           loss_scale, _loss = self.optimizer.backward(loss)

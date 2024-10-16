@@ -24,8 +24,6 @@ Compared with state-of-the-art methods, HRA achieves superior performance with f
 
 ## Usage
 
-we adapted pre-trained Stable Diffusion (SD) for subject-driven generation and controllable generation, respectively.
-
 ### Subject-driven Generation
 
 <div align="center">
@@ -276,13 +274,11 @@ OUTPUT="YOUR_MODEL_SAVED_PATH"
 
 ## Citing our work
 ```bibtex
-@misc{yuan2024bridging,
-      title={Bridging The Gap between Low-rank and Orthogonal Adaptation via Householder Reflection Adaptation}, 
-      author={Shen Yuan and Haotian Liu and Hongteng Xu},
-      year={2024},
-      eprint={2405.17484},
-      archivePrefix={arXiv},
-      primaryClass={cs.LG}
+@article{yuan2024bridging,
+  title={Bridging The Gap between Low-rank and Orthogonal Adaptation via Householder Reflection Adaptation},
+  author={Yuan, Shen and Liu, Haotian and Xu, Hongteng},
+  journal={arXiv preprint arXiv:2405.17484},
+  year={2024}
 }
 ```
 
