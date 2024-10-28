@@ -12,10 +12,10 @@ python -m DeBERTa.apps.run --model_config config.json  \
 	--max_seq_len 256 \
 	--eval_batch_size 256 \
 	--dump_interval 1000 \
-	--num_train_epochs 10 \
+	--num_train_epochs 8 \
 	--fp16 True \
 	--warmup 1000 \
-	--learning_rate 1e-2 \
+	--learning_rate 9e-4 \
 	--train_batch_size 32 \
 	--cls_drop_out 0.1 \
 	--task_name $task \
