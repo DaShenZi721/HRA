@@ -441,6 +441,16 @@ class DDPM(pl.LightningModule):
 
         loss, loss_dict = self.shared_step(batch)
 
+        # --------------------------------------------------------
+        # orthogonality regularizer
+        # for name, param in self.model.named_parameters():
+        #     if 'hra_u' in name:
+        #         device = param.device
+        #         hra_u_norm = param / (param.norm(dim=0))
+        #         orth_loss = torch.norm(torch.eye(8, device=device) - hra_u_norm.t() @ hra_u_norm)    
+        #         loss = loss + 1e-5 * orth_loss    
+        # --------------------------------------------------------
+
         self.log_dict(loss_dict, prog_bar=True,
                       logger=True, on_step=True, on_epoch=True)
 

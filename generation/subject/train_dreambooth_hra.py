@@ -964,6 +964,16 @@ def main(args):
                     loss = loss + args.prior_loss_weight * prior_loss
                 else:
                     loss = F.mse_loss(model_pred.float(), target.float(), reduction="mean")
+                
+                # --------------------------------------------------------
+                # orthogonality regularizer
+                # for name, param in unet.named_parameters():
+                #     if 'hra_u' in name:
+                #         device = param.device
+                #         hra_u_norm = param / (param.norm(dim=0))
+                #         orth_loss = torch.norm(torch.eye(8, device=device) - hra_u_norm.t() @ hra_u_norm)
+                #         loss = loss + 1e-5 * orth_loss    
+                # --------------------------------------------------------
 
                 accelerator.backward(loss)
                 if accelerator.sync_gradients:
