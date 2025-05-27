@@ -11,10 +11,6 @@
   <img src="assets/OHRFT_scheme.png" width="1100"/>
 </div>
 
-<p align="center">
-  <a href="https://arxiv.org/abs/2405.17484">arXiv</a> 
-</p>
-
 
 
 ## Introduction
