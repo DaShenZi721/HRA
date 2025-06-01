@@ -1,6 +1,6 @@
 <div align=center>
 
-# Bridging The Gap between Low-rank and Orthogonal Adaptation via Householder Reflection Adaptation
+# [NeurIPS 2024 Spotlight] Bridging The Gap between Low-rank and Orthogonal Adaptation via Householder Reflection Adaptation
 
 [![arXiv](https://img.shields.io/badge/arXiv-2502.14637-b31b1b?style=flat&logo=arxiv)](https://arxiv.org/pdf/2405.17484)
 [![Hugging Face](https://img.shields.io/badge/Hugging%20Face-Peft-orange?style=flat&logo=huggingface)](https://huggingface.co/docs/peft/en/package_reference/hra)
@@ -272,10 +272,10 @@ OUTPUT="YOUR_MODEL_SAVED_PATH"
 ## 📌 Citing our work
 If you find our work useful, please cite it:
 ```bibtex
-@article{yuan2024bridging,
+@inproceedings{yuanbridging,
   title={Bridging The Gap between Low-rank and Orthogonal Adaptation via Householder Reflection Adaptation},
   author={Yuan, Shen and Liu, Haotian and Xu, Hongteng},
-  journal={arXiv preprint arXiv:2405.17484},
+  booktitle={The Thirty-eighth Annual Conference on Neural Information Processing Systems},
   year={2024}
 }
 ```
